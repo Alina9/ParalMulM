@@ -2,14 +2,15 @@ package edu.spbu;
 
 import java.util.*;
 import java.io.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 
 public class SparseMatrix  implements Matrix {
 
     public int size;
-    public Map<Integer, row> map;
+    public ConcurrentHashMap<Integer, row> map;
 
-    public SparseMatrix(Map<Integer, row> m, int size) {
+    public SparseMatrix(ConcurrentHashMap<Integer, row> m, int size) {
         this.size = size;
         this.map = m;
     }
@@ -17,7 +18,7 @@ public class SparseMatrix  implements Matrix {
 
     public SparseMatrix(int size) {
         this.size = size;
-        this.map = new HashMap<>();
+        this.map = new ConcurrentHashMap<>();
     }
 
     public SparseMatrix(BufferedReader s) {
@@ -28,7 +29,7 @@ public class SparseMatrix  implements Matrix {
             int k = arr.length;
             double number;
             size = k;
-            map = new HashMap<Integer, row>();
+            map = new ConcurrentHashMap<Integer, row>();
             row tmap = new row();
 
             for (int j = 0; j < size; j++) {
@@ -63,13 +64,86 @@ public class SparseMatrix  implements Matrix {
     }
 
     public Matrix mul(Matrix other) {
-        if (other instanceof SparseMatrix) return this.mulSparseSparse((SparseMatrix) other);
+        if (other instanceof SparseMatrix) try {
+            return this.mulSparseSparse((SparseMatrix) other);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            return null;
+        }
         else return this.mulSparseDence((DenseMatrix) other);
     }
+    public SparseMatrix mulSparseSparse(SparseMatrix other) throws InterruptedException {
 
+        other = other.MatrixSTrans();
+        SparseMatrix result = new SparseMatrix(size);
+        Iterator<ConcurrentHashMap.Entry<Integer, row>> iter1 = this.map.entrySet().iterator();
+        MulSS t = new MulSS(this.map,other.map,result.map,iter1);
+
+
+        Thread t1 = new Thread(t);
+        Thread t2 = new Thread(t);
+        Thread t3 = new Thread(t);
+        Thread t4 = new Thread(t);
+
+        t1.start();
+        t2.start();
+        t3.start();
+        t4.start();
+        t1.join();
+        t2.join();
+        t3.join();
+        t4.join();
+        return result;
+    }
+
+class MulSS implements Runnable{
+    ConcurrentHashMap<Integer,row> A;
+    ConcurrentHashMap<Integer,row> B;
+    ConcurrentHashMap<Integer,row> result;
+    Iterator<ConcurrentHashMap.Entry<Integer, row>> iter1;
+
+    public MulSS(ConcurrentHashMap<Integer,row> A,ConcurrentHashMap<Integer,row> B,ConcurrentHashMap<Integer,row> result,Iterator<ConcurrentHashMap.Entry<Integer, row>> iter1){
+        this.A = A;
+        this.B = B;
+        this.result = result;
+        this.iter1 = iter1;
+    }
+
+    public void run() {
+        for (HashMap.Entry entry1 = iter1.next();entry1 != null; entry1 = iter1.next()){
+            Integer key1 = (Integer) entry1.getKey();
+            HashMap<Integer, Double> value1 = (HashMap<Integer, Double>) entry1.getValue();// строки первой матрицы
+            Iterator<HashMap.Entry<Integer, row>> iter2 = B.entrySet().iterator();
+            row resRow = new row();
+            while (iter2.hasNext()) {
+                HashMap.Entry entry2 = iter2.next();
+                Integer key2 = (Integer) entry2.getKey();
+                HashMap<Integer, Double> value2 = (HashMap<Integer, Double>) entry2.getValue();// строки второй матрицы
+                Iterator iterElement = value1.entrySet().iterator();
+                double resValue = 0;
+                while (iterElement.hasNext()) {
+                    HashMap.Entry entryElement = (HashMap.Entry) iterElement.next();
+                    Integer keyElement1 = (Integer) entryElement.getKey();
+                    Double valueElement1 = (Double) entryElement.getValue();
+                    if (value2.get(keyElement1) != null) {
+                        double a = value2.get(keyElement1);
+                        resValue = resValue + valueElement1 * a;
+                    }
+                }
+                if (resValue != 0) {
+                    resRow.put(key2, resValue);
+                }
+            }
+            if (resRow != null) {
+                result.put(key1, resRow);
+            }
+        }
+
+    }
+}
     public SparseMatrix MatrixSTrans() {
         Iterator<Map.Entry<Integer, row>> iter = map.entrySet().iterator(); // получаем строки
-        HashMap<Integer, row> matrixTr = new HashMap<Integer, row>();
+        ConcurrentHashMap<Integer, row> matrixTr = new ConcurrentHashMap<Integer, row>();
         while (iter.hasNext()) {
             Map.Entry entry = iter.next();
             Integer keyRow = (Integer) entry.getKey();// получаем номер строки
@@ -90,43 +164,6 @@ public class SparseMatrix  implements Matrix {
 
         }
         return new SparseMatrix(matrixTr, size);
-    }
-
-    public SparseMatrix mulSparseSparse(SparseMatrix other) {
-
-        SparseMatrix resS = new SparseMatrix(size);
-        Iterator<Map.Entry<Integer, row>> iter1 = this.map.entrySet().iterator();
-        other = other.MatrixSTrans();
-        while (iter1.hasNext()) {
-            Map.Entry entry1 = iter1.next();
-            Integer key1 = (Integer) entry1.getKey();
-            HashMap<Integer, Double> value1 = (HashMap<Integer, Double>) entry1.getValue();// строки первой матрицы
-            row resRow = new row();
-            Iterator<Map.Entry<Integer, row>> iter2 = other.map.entrySet().iterator();
-            while (iter2.hasNext()) {
-                Map.Entry entry2 = iter2.next();
-                Integer key2 = (Integer) entry2.getKey();
-                HashMap<Integer, Double> value2 = (HashMap<Integer, Double>) entry2.getValue();// строки второй матрицы
-                Iterator iterElement = value1.entrySet().iterator();
-                double resValue = 0;
-                while (iterElement.hasNext()) {
-                    Map.Entry entryElement = (Map.Entry) iterElement.next();
-                    Integer keyElement1 = (Integer) entryElement.getKey();
-                    Double valueElement1 = (Double) entryElement.getValue();
-                    if (value2.get(keyElement1) != null) {
-                        double a = value2.get(keyElement1);
-                        resValue = resValue + valueElement1 * a;
-                    }
-                }
-                if (resValue != 0) {
-                    resRow.put(key2, resValue);
-                }
-            }
-            if (resRow != null) {
-                resS.map.put(key1, resRow);
-            }
-        }
-        return resS;
     }
 
     public SparseMatrix mulSparseDence(DenseMatrix other) {

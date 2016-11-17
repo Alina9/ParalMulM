@@ -1,4 +1,5 @@
 package edu.spbu;
+import java.lang.*;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -52,23 +53,63 @@ public class DenseMatrix implements Matrix {
 
 
     public Matrix mul(Matrix other) {
-        if (other instanceof DenseMatrix) return this.mulDenseDense((DenseMatrix) other);
+        if (other instanceof DenseMatrix) try {
+            return this.mulDenseDense((DenseMatrix) other);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            return null;
+        }
         else return this.mulDenceSparse((SparseMatrix) other);
     }
 
 
-    public DenseMatrix mulDenseDense(DenseMatrix other) {
-        other = other.MatrixSTrans();
-        DenseMatrix res = new DenseMatrix(size);
-        for (int i = 0; i < size; i++) {
+public DenseMatrix mulDenseDense(DenseMatrix other) throws InterruptedException {
+    other = other.MatrixSTrans();
+    DenseMatrix result = new DenseMatrix(size);
+    mulDD t = new mulDD(this.matrix,other.matrix,result.matrix);
+    Thread t1 = new Thread(t);
+    Thread t2 = new Thread(t);
+    Thread t3 = new Thread(t);
+    Thread t4 = new Thread(t);
+
+    t1.start();
+    t2.start();
+    t3.start();
+    t4.start();
+    t1.join();
+    t2.join();
+    t3.join();
+    t4.join();
+return result;
+    }
+public class mulDD implements Runnable {
+    double[][] A;
+    double[][] B;
+    double[][] result;
+    int num = 0;
+
+    public mulDD(double[][] A, double[][] B, double[][] result) {
+        this.A = A;
+        this.B = B;
+        this.result = result;
+    }
+
+    public void run() {
+        for (int i = next(); i < size; i = next()) {
             for (int j = 0; j < size; j++) {
                 for (int k = 0; k < size; k++) {
-                    res.matrix[i][j] += this.matrix[i][k] * other.matrix[j][k];
+                    result[i][j] += A[i][k] * B[j][k];
                 }
             }
+
         }
-        return res;
     }
+    public int next(){
+        synchronized (this) {
+            return num++;
+        }
+    }
+}
 
 
     public SparseMatrix mulDenceSparse(SparseMatrix other) {
