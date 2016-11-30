@@ -110,7 +110,8 @@ class MulSS implements Runnable{
     }
 
     public void run() {
-        for (HashMap.Entry entry1 = iter1.next();entry1 != null; entry1 = iter1.next()){
+        while (iter1.hasNext()) {
+            Map.Entry entry1 = iter1.next();
             Integer key1 = (Integer) entry1.getKey();
             HashMap<Integer, Double> value1 = (HashMap<Integer, Double>) entry1.getValue();// строки первой матрицы
             Iterator<HashMap.Entry<Integer, row>> iter2 = B.entrySet().iterator();
